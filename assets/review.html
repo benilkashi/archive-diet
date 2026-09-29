@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archive review</title>
+<style>
+  :root {
+    --bg: #0e0f13; --panel: #171922; --line: #272a36;
+    --fg: #e8e9ee; --muted: #8b8fa3;
+    --keep: #2fbf71; --del: #e5484d; --accent: #6b7cff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, "SF Pro Text", "Heebo", Segoe UI, system-ui, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  button {
+    font: inherit; font-weight: 600; padding: 9px 18px; border-radius: 10px;
+    border: 1px solid var(--line); background: #0e0f13; color: var(--fg);
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.keep { border-color: rgba(47,191,113,.45); color: var(--keep); }
+  button.del  { border-color: rgba(229,72,77,.45);  color: var(--del); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.small { padding: 5px 11px; font-size: 12.5px; font-weight: 500; }
+  kbd {
+    font: 11px ui-monospace, Menlo, Consolas, monospace; background: var(--panel);
+    border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; color: var(--muted);
+  }
+
+  header {
+    display: flex; align-items: center; gap: 14px; flex: 0 0 auto;
+    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header .title { font-weight: 600; }
+  .count { font-variant-numeric: tabular-nums; font-size: 13px;
+           color: var(--muted); direction: ltr; unicode-bidi: isolate; }
+  .tally { display: flex; gap: 8px; margin-inline-start: auto; align-items: center;
+           font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tally span.pill { padding: 3px 10px; border-radius: 999px; background: #0e0f13;
+                     border: 1px solid var(--line); color: var(--del); }
+  .bar { height: 2px; background: var(--line); flex: 0 0 auto; }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0;
+             transition: width .15s; }
+
+  main { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  .pad { padding: 20px 16px 40px; }
+
+  /* ---------- menu ---------- */
+  .menu { max-width: 760px; margin: 0 auto; }
+  .menu h1 { font-size: 21px; margin: 6px 0 4px; }
+  .menu .sub { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
+  .cat {
+    display: flex; align-items: center; gap: 14px; width: 100%;
+    padding: 14px 16px; margin-bottom: 10px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--panel); cursor: pointer;
+    text-align: start; font-weight: 400;
+  }
+  .cat:hover { border-color: var(--accent); }
+  .cat .nm { font-weight: 600; font-size: 16px; }
+  /* text-align is set explicitly because .meta is also the class used by the
+     swipe card, where it is centred. Without this, the menu subtitle inherits
+     that centring and drifts right as the category name above it gets longer. */
+  .cat .meta { font-size: 12.5px; color: var(--muted); margin-top: 2px;
+               text-align: start; }
+  .cat .right { margin-inline-start: auto; text-align: end; font-size: 12.5px;
+                color: var(--muted); }
+  .cat .mode { font-size: 11px; padding: 2px 8px; border-radius: 999px;
+               border: 1px solid var(--line); color: var(--muted); }
+  .cat .marked { color: var(--del); font-weight: 600; }
+  .cat .fin { color: var(--keep); font-weight: 600; }
+  .menu .foot { margin-top: 24px; display: flex; gap: 10px; align-items: center;
+                flex-wrap: wrap; }
+  .menu .note { font-size: 12.5px; color: var(--muted); margin-top: 14px;
+                line-height: 1.6; }
+
+  /* ---------- swipe ---------- */
+  .swipe { height: 100%; display: flex; flex-direction: column; }
+  .stagewrap { flex: 1 1 auto; display: grid; place-items: center; padding: 16px;
+               min-height: 0; }
+  .card { position: relative; display: flex; flex-direction: column; gap: 10px;
+          align-items: center; max-width: 100%; max-height: 100%;
+          touch-action: none; user-select: none; }
+  .stage { position: relative; background: #000; border: 1px solid var(--line);
+           border-radius: 14px; overflow: hidden; display: grid; place-items: center;
+           min-height: 0; }
+  .stage img, .stage video { display: block; max-width: 100%;
+    max-height: calc(100vh - 280px); object-fit: contain; }
+  .broken { padding: 60px 40px; color: var(--muted); font-size: 14px; }
+  .stamp { position: absolute; top: 18px; font-size: 30px; font-weight: 800;
+    letter-spacing: .08em; padding: 6px 18px; border-radius: 10px;
+    border: 4px solid currentColor; opacity: 0; pointer-events: none;
+    transition: opacity .08s; }
+  .stamp.keepS { inset-inline-start: 18px; color: var(--keep); transform: rotate(8deg); }
+  .stamp.delS  { inset-inline-end: 18px;  color: var(--del);  transform: rotate(-8deg); }
+  .meta { text-align: center; max-width: 100%; }
+  .path { font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
+          direction: ltr; unicode-bidi: isolate; word-break: break-all; }
+  .reasons { margin-top: 7px; display: flex; gap: 6px; flex-wrap: wrap;
+             justify-content: center; }
+  .reasons b { font-size: 12px; font-weight: 500; padding: 3px 10px;
+    border-radius: 999px; background: rgba(229,72,77,.12); color: #ff9a9d;
+    border: 1px solid rgba(229,72,77,.3); }
+  .size { font-size: 12px; color: var(--muted); margin-top: 6px;
+          direction: ltr; unicode-bidi: isolate; }
+
+  footer { flex: 0 0 auto; display: flex; gap: 10px; align-items: center;
+    justify-content: center; padding: 12px 16px; border-top: 1px solid var(--line);
+    background: var(--panel); flex-wrap: wrap; }
+  .hint { width: 100%; text-align: center; font-size: 12px; color: var(--muted); }
+
+  /* ---------- grid ---------- */
+  .gridbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+             max-width: 1400px; margin: 0 auto 16px; }
+  .gridbar .spacer { margin-inline-start: auto; }
+  .grid { display: grid; gap: 8px; max-width: 1400px; margin: 0 auto;
+          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .cell { position: relative; aspect-ratio: 1; border-radius: 10px;
+          overflow: hidden; border: 2px solid var(--line); background: #000;
+          cursor: pointer; }
+  .cell img { width: 100%; height: 100%; object-fit: cover; display: block;
+              opacity: .92; }
+  .cell.on { border-color: var(--del); }
+  .cell.on img { opacity: .4; }
+  /* physical left/right on purpose: these badges should not swap places when
+     the page direction flips, and their contents are numeric either way */
+  .cell .tick { position: absolute; top: 6px; right: 6px;
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff8;
+    background: #0008; display: grid; place-items: center; font-size: 13px;
+    color: #fff; font-weight: 700; }
+  .cell.on .tick { background: var(--del); border-color: var(--del); }
+  .cell .zoom { position: absolute; bottom: 6px; right: 6px;
+    width: 22px; height: 22px; border-radius: 6px; background: #000a;
+    display: grid; place-items: center; font-size: 12px; color: #fff;
+    border: 1px solid #fff3; }
+  .cell .dim { position: absolute; bottom: 6px; left: 6px; white-space: nowrap;
+    font: 10px ui-monospace, Menlo, Consolas, monospace; color: #fff;
+    background: #000a; padding: 1px 5px; border-radius: 4px;
+    direction: ltr; unicode-bidi: isolate; }
+
+  .overlay { position: fixed; inset: 0; background: #000e; z-index: 50;
+    display: grid; place-items: center; padding: 30px; }
+  .overlay img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .overlay .close { position: absolute; top: 16px; inset-inline-end: 16px; }
+
+  /* ---------- done ---------- */
+  .done { max-width: 620px; margin: 0 auto; text-align: center; padding: 30px 10px; }
+  .done h2 { margin: 0 0 6px; font-size: 22px; }
+  .done p { color: var(--muted); margin: 0 0 18px; }
+  .done .big { font-size: 15px; margin-bottom: 20px; }
+  .done .big s { color: var(--del); text-decoration: none; font-weight: 700; }
+  textarea { width: 100%; height: 110px; margin-top: 16px; background: #0e0f13;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px; font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    direction: ltr; }
+  .empty { text-align: center; color: var(--muted); padding: 50px; }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="back" class="small" style="display:none"></button>
+  <div class="title" id="htitle"></div>
+  <div class="count" id="hcount"></div>
+  <div class="tally">
+    <span class="pill" id="tally"></span>
+    <button class="small" id="lang"></button>
+  </div>
+</header>
+<div class="bar"><i id="prog"></i></div>
+<main id="main"></main>
+<footer id="foot" style="display:none"></footer>
+
+<script>
+/* ==========================================================================
+   Data is injected by scan.py in place of the placeholder below.
+   Shape: { categories: [{key, count, bytes, mode}], items: [{rel, size, kind,
+            cat, reasons: [{k, d}]}] }
+   Category and reason keys are stable identifiers, never display text - that
+   is what lets the same page render in more than one language.
+   ========================================================================== */
+const DATA = /*__DATA__*/null;
+const CATS  = (DATA && DATA.categories) || [];
+const ITEMS = (DATA && DATA.items) || [];
+
+const STR = {
+  en: {
+    dir: 'ltr', name: 'English', other: 'עברית',
+    appTitle: 'Archive review',
+    back: '‹ Back',
+    marked: n => `${n} marked`,
+    menuTitle: 'What was found',
+    menuSub: (n, b) => `${n} candidates, ${b} in total. Work top to bottom - the first ` +
+                       `category is worth the most. You can stop after any of them.`,
+    files: n => `${n} files`,
+    modeGrid: 'grid', modeSwipe: 'one by one',
+    done: 'done', markedShort: n => `${n} marked`,
+    finish: 'Finish and export',
+    markedTotal: n => `${n} files marked for deletion`,
+    safety: 'Nothing is deleted here. Exporting produces a list; even then, ' +
+            'deletion means moving files to a separate folder that you remove yourself.',
+    empty: 'Nothing was flagged. The archive is clean.',
+    keep: 'Keep', del: 'Delete', undo: 'Undo',
+    swipeHint: 'Keeping is the default. Leaving a category does not delete anything.',
+    selectAll: n => `Select all for deletion (${n})`,
+    clearAll: 'Clear selection',
+    gridCount: (n, t) => `${n} / ${t} selected`,
+    saveBack: 'Save and go back',
+    exportTitle: 'Ready to export',
+    exportSub: 'Nothing has been deleted. No file has moved.',
+    exportLine: (n, b) => `You marked <s>${n}</s> files for deletion (${b}).`,
+    download: 'Download decisions',
+    backToCats: 'Back to categories',
+    downloadHint: 'Saves as decisions.json in your downloads folder.',
+    notLoaded: 'File did not load',
+    close: 'Close',
+    cat: {
+      large: 'Large files', screenshot: 'Screenshots', duplicate: 'Exact duplicates',
+      messaging: 'From messaging apps', web: 'Downloaded or saved from the web',
+      small: 'Small files', tiny: 'Thumbnail-sized',
+    },
+    reason: {
+      duplicate: d => `Exact duplicate of: ${d}`,
+      screenshot: d => d ? `Screenshot · ${d}` : 'Screenshot',
+      large_video: d => `Large video · ${d}`,
+      large_image: d => `Large image · ${d}`,
+      messaging: d => d || 'Messaging app',
+      web: d => d || 'Downloaded',
+      tiny: d => `Thumbnail-sized · ${d}`,
+      small: d => `Small · ${d}`,
+    },
+    detail: {},
+  },
+  he: {
+    dir: 'rtl', name: 'עברית', other: 'English',
+    appTitle: 'סינון ארכיון',
+    back: '› חזרה',
+    marked: n => `${n} למחיקה`,
+    menuTitle: 'מה נמצא',
+    menuSub: (n, b) => `${n} מועמדים, ${b} סך הכל. עבוד לפי הסדר — הקטגוריה ` +
+                       `הראשונה שווה הכי הרבה. אפשר לעצור אחרי כל אחת מהן.`,
+    files: n => `${n} קבצים`,
+    modeGrid: 'רשת', modeSwipe: 'אחד-אחד',
+    done: 'הושלם', markedShort: n => `${n} למחיקה`,
+    finish: 'סיום וייצוא',
+    markedTotal: n => `${n} קבצים מסומנים למחיקה`,
+    safety: 'שום קובץ לא נמחק כאן. הייצוא מייצר רשימה בלבד, וגם אז המחיקה היא ' +
+            'העברה לתיקייה נפרדת שאתה מוחק בעצמך.',
+    empty: 'לא נמצאו מועמדים. הארכיון נקי.',
+    keep: 'השאר', del: 'מחק', undo: 'בטל',
+    swipeHint: 'ברירת המחדל היא להשאיר. יציאה מהקטגוריה לא מוחקת כלום.',
+    selectAll: n => `סמן הכל למחיקה (${n})`,
+    clearAll: 'נקה סימון',
+    gridCount: (n, t) => `${n} / ${t} מסומנים`,
+    saveBack: 'שמור וחזור',
+    exportTitle: 'מוכן לייצוא',
+    exportSub: 'עדיין לא נמחק כלום. שום קובץ לא זז.',
+    exportLine: (n, b) => `סימנת <s>${n}</s> קבצים למחיקה (${b}).`,
+    download: 'הורד את ההחלטות',
+    backToCats: 'חזרה לקטגוריות',
+    downloadHint: 'נשמר בשם decisions.json בתיקיית ההורדות.',
+    notLoaded: 'הקובץ לא נטען',
+    close: 'סגור',
+    cat: {
+      large: 'קבצים גדולים', screenshot: 'צילומי מסך', duplicate: 'כפילויות מדויקות',
+      messaging: 'מאפליקציות הודעות', web: 'הורדות מהרשת',
+      small: 'קבצים קטנים', tiny: 'בגודל תמונה ממוזערת',
+    },
+    reason: {
+      duplicate: d => `כפילות מדויקת של: ${d}`,
+      screenshot: d => d ? `צילום מסך · ${d}` : 'צילום מסך',
+      large_video: d => `וידאו גדול · ${d}`,
+      large_image: d => `תמונה גדולה · ${d}`,
+      messaging: d => d || 'אפליקציית הודעות',
+      web: d => d || 'הורדה',
+      tiny: d => `תמונה ממוזערת · ${d}`,
+      small: d => `קטן · ${d}`,
+    },
+    detail: { 'download': 'הורדה', 'timestamp name': 'שם של חותמת זמן', 'sticker': 'סטיקר' },
+  },
+};
+
+let lang = 'en';
+try { const s = localStorage.getItem('archive-diet-lang'); if (STR[s]) lang = s; } catch (e) {}
+
+const T = () => STR[lang];
+// decisions: rel -> 'keep' | 'del'. Absent means untouched, which means keep.
+const decisions = new Map();
+let view = null;                        // null = menu, else {cat, mode, list, i}
+
+const $ = id => document.getElementById(id);
+const main = $('main'), foot = $('foot');
+
+const human = n => { const u = ['B','KB','MB','GB']; let k = 0;
+  while (n >= 1024 && k < 3) { n /= 1024; k++; } return n.toFixed(1) + ' ' + u[k]; };
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const url = p => p.split('/').map(encodeURIComponent).join('/');
+const itemsOf = key => ITEMS.filter(x => x.cat === key);
+const delCount = () => [...decisions.values()].filter(v => v === 'del').length;
+const catLabel = key => T().cat[key] || key;
+
+// A reason arrives as {k: 'large_video', d: '1.3 GB'} and is rendered here, so
+// the same data reads correctly in either language.
+function reasonText(r) {
+  const detail = T().detail[r.d] || r.d || '';
+  const fn = T().reason[r.k];
+  return fn ? fn(detail) : (detail || r.k);
+}
+// Each segment isolated: a right-to-left sentence with a Latin or numeric tail
+// otherwise gets reordered into nonsense by the bidirectional text algorithm.
+const reasonHTML = r => '<b>' + reasonText(r).split(' · ')
+  .map(p => `<bdi>${esc(p)}</bdi>`).join(' · ') + '</b>';
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = T().dir;
+  document.title = T().appTitle;
+  $('lang').textContent = T().other;
+  $('back').textContent = T().back;
+  $('tally').textContent = T().marked(delCount());
+}
+
+function refreshTally() { $('tally').textContent = T().marked(delCount()); }
+
+/* ============================ menu ============================ */
+function showMenu() {
+  view = null;
+  $('back').style.display = 'none';
+  $('htitle').textContent = T().appTitle;
+  $('hcount').textContent = '';
+  $('prog').style.width = '0';
+  foot.style.display = 'none';
+
+  if (!ITEMS.length) {
+    main.innerHTML = `<div class="empty">${esc(T().empty)}</div>`;
+    return;
+  }
+
+  const rows = CATS.map(c => {
+    const list = itemsOf(c.key);
+    const seen = list.filter(x => decisions.has(x.rel)).length;
+    const marked = list.filter(x => decisions.get(x.rel) === 'del').length;
+    const status = seen === 0 ? ''
+      : seen === list.length
+        ? `<span class="fin">✓ ${esc(T().done)}</span> · <span class="marked">${esc(T().markedShort(marked))}</span>`
+        : `<bdi>${seen}/${list.length}</bdi> · <span class="marked">${esc(T().markedShort(marked))}</span>`;
+    return `<button class="cat" data-cat="${esc(c.key)}">
+      <div>
+        <div class="nm">${esc(catLabel(c.key))}</div>
+        <div class="meta"><bdi>${esc(T().files(c.count))}</bdi> · <bdi>${human(c.bytes)}</bdi></div>
+      </div>
+      <div class="right">
+        <div class="mode">${esc(c.mode === 'grid' ? T().modeGrid : T().modeSwipe)}</div>
+        <div style="margin-top:6px">${status || '&nbsp;'}</div>
+      </div>
+    </button>`;
+  }).join('');
+
+  const totalBytes = CATS.reduce((s, c) => s + c.bytes, 0);
+  main.innerHTML = `<div class="pad"><div class="menu">
+    <h1>${esc(T().menuTitle)}</h1>
+    <div class="sub">${esc(T().menuSub(ITEMS.length, human(totalBytes)))}</div>
+    ${rows}
+    <div class="foot">
+      <button class="primary" id="finish">${esc(T().finish)}</button>
+      <span class="count">${esc(T().markedTotal(delCount()))}</span>
+    </div>
+    <div class="note">${esc(T().safety)}</div>
+  </div></div>`;
+
+  main.querySelectorAll('.cat').forEach(b => b.onclick = () => openCat(b.dataset.cat));
+  $('finish').onclick = showDone;
+  refreshTally();
+}
+
+function openCat(key) {
+  const meta = CATS.find(c => c.key === key);
+  view = { cat: key, mode: meta.mode, list: itemsOf(key), i: 0 };
+  $('back').style.display = '';
+  $('htitle').textContent = catLabel(key);
+  if (view.mode === 'grid') renderGrid(); else renderSwipe();
+}
+
+/* ============================ swipe ============================ */
+function renderSwipe() {
+  const { list, i } = view;
+  if (i >= list.length) { showMenu(); return; }
+  const it = list[i];
+
+  const media = it.kind === 'video'
+    ? `<video src="${url(it.rel)}" controls muted playsinline preload="metadata"
+         onerror="this.outerHTML='<div class=broken>'+BROKEN+'</div>'"></video>`
+    : `<img src="${url(it.rel)}" alt=""
+         onerror="this.outerHTML='<div class=broken>'+BROKEN+'</div>'">`;
+
+  main.innerHTML = `<div class="swipe"><div class="stagewrap">
+    <div class="card" id="card">
+      <div class="stage">${media}
+        <div class="stamp keepS">${esc(T().keep)}</div>
+        <div class="stamp delS">${esc(T().del)}</div></div>
+      <div class="meta">
+        <div class="path">${esc(it.rel)}</div>
+        <div class="reasons">${it.reasons.map(reasonHTML).join('')}</div>
+        <div class="size">${human(it.size)}</div>
+      </div>
+    </div></div></div>`;
+
+  foot.style.display = '';
+  foot.innerHTML = `
+    <button class="del" id="bDel">${esc(T().del)} <kbd>&larr;</kbd></button>
+    <button id="bUndo">${esc(T().undo)} <kbd>Z</kbd></button>
+    <button class="keep" id="bKeep">${esc(T().keep)} <kbd>&rarr;</kbd></button>
+    <div class="hint">${esc(T().swipeHint)}</div>`;
+  $('bKeep').onclick = () => decide('keep');
+  $('bDel').onclick  = () => decide('del');
+  $('bUndo').onclick = undo;
+
+  $('hcount').textContent = `${i + 1} / ${list.length}`;
+  $('prog').style.width = (100 * i / list.length) + '%';
+  attachDrag($('card'));
+}
+
+function decide(what) {
+  if (!view || view.i >= view.list.length) return;
+  decisions.set(view.list[view.i].rel, what);
+  view.i++;
+  refreshTally();
+  renderSwipe();
+}
+function undo() {
+  if (!view || view.i === 0) return;
+  view.i--;
+  decisions.delete(view.list[view.i].rel);
+  refreshTally();
+  renderSwipe();
+}
+
+function attachDrag(card) {
+  if (!card) return;
+  let x0 = null, dx = 0;
+  const K = card.querySelector('.keepS'), D = card.querySelector('.delS');
+  // Dragging right always keeps and left always deletes, in both directions -
+  // this is muscle memory from card-sorting apps, not reading order.
+  const down = e => {
+    if (e.target.closest('video')) return;
+    x0 = (e.touches ? e.touches[0] : e).clientX; dx = 0;
+    card.style.transition = 'none';
+  };
+  const move = e => {
+    if (x0 === null) return;
+    dx = ((e.touches ? e.touches[0] : e).clientX) - x0;
+    card.style.transform = `translateX(${dx}px) rotate(${dx / 28}deg)`;
+    K.style.opacity = dx >  40 ? Math.min(1, ( dx - 40) / 70) : 0;
+    D.style.opacity = dx < -40 ? Math.min(1, (-dx - 40) / 70) : 0;
+  };
+  const up = () => {
+    if (x0 === null) return;
+    const d = dx; x0 = null;
+    card.style.transition = 'transform .18s ease-out';
+    if (Math.abs(d) > 110) {
+      card.style.transform = `translateX(${d > 0 ? 1200 : -1200}px) rotate(${d / 12}deg)`;
+      setTimeout(() => decide(d > 0 ? 'keep' : 'del'), 130);
+    } else {
+      card.style.transform = ''; K.style.opacity = D.style.opacity = 0;
+    }
+  };
+  card.addEventListener('mousedown', down);
+  card.addEventListener('touchstart', down, { passive: true });
+  addEventListener('mousemove', move);
+  card.addEventListener('touchmove', move, { passive: true });
+  addEventListener('mouseup', up);
+  card.addEventListener('touchend', up);
+}
+
+/* ============================ grid ============================ */
+function renderGrid() {
+  const { list } = view;
+  const cells = list.map((it, n) => {
+    const on = decisions.get(it.rel) === 'del';
+    const dim = (it.reasons.find(r => /^\d+x\d+$/.test(r.d || '')) || {}).d;
+    return `<div class="cell${on ? ' on' : ''}" data-n="${n}" title="${esc(it.rel)}">
+      <img loading="lazy" src="${url(it.rel)}" alt="">
+      <div class="tick">${on ? '✕' : ''}</div>
+      ${dim ? `<div class="dim">${esc(dim)}</div>` : ''}
+      <div class="zoom" data-zoom="${n}">⤢</div>
+    </div>`;
+  }).join('');
+
+  main.innerHTML = `<div class="pad">
+    <div class="gridbar">
+      <button class="del" id="all">${esc(T().selectAll(list.length))}</button>
+      <button id="none">${esc(T().clearAll)}</button>
+      <span class="count" id="gcount"></span>
+      <span class="spacer"></span>
+      <button class="primary" id="gdone">${esc(T().saveBack)}</button>
+    </div>
+    <div class="grid" id="grid">${cells}</div>
+  </div>`;
+
+  foot.style.display = 'none';
+  $('hcount').textContent = T().files(list.length);
+  $('prog').style.width = '0';
+
+  const updateCount = () => {
+    const n = list.filter(x => decisions.get(x.rel) === 'del').length;
+    $('gcount').textContent = T().gridCount(n, list.length);
+    refreshTally();
+  };
+
+  $('grid').onclick = e => {
+    const z = e.target.closest('[data-zoom]');
+    if (z) { e.stopPropagation(); zoom(list[+z.dataset.zoom]); return; }
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    const it = list[+cell.dataset.n];
+    const on = decisions.get(it.rel) === 'del';
+    decisions.set(it.rel, on ? 'keep' : 'del');
+    cell.classList.toggle('on', !on);
+    cell.querySelector('.tick').textContent = on ? '' : '✕';
+    updateCount();
+  };
+  // Selecting the whole category is one deliberate click, not the default
+  // state: nothing should end up marked because somebody did not look.
+  $('all').onclick  = () => { list.forEach(x => decisions.set(x.rel, 'del'));  renderGrid(); };
+  $('none').onclick = () => { list.forEach(x => decisions.set(x.rel, 'keep')); renderGrid(); };
+  $('gdone').onclick = showMenu;
+  updateCount();
+}
+
+function zoom(it) {
+  const o = document.createElement('div');
+  o.className = 'overlay';
+  o.innerHTML = `<img src="${url(it.rel)}" alt="">
+    <button class="close">${esc(T().close)}</button>`;
+  o.onclick = () => o.remove();
+  document.body.appendChild(o);
+}
+
+/* ============================ export ============================ */
+function showDone() {
+  const del = ITEMS.filter(x => decisions.get(x.rel) === 'del');
+  const bytes = del.reduce((s, f) => s + f.size, 0);
+  // Reasons are exported as rendered text so the file is readable on its own,
+  // away from this page.
+  const payload = JSON.stringify({
+    generated: new Date().toISOString(),
+    reviewed: decisions.size,
+    delete: del.map(f => ({ rel: f.rel, size: f.size,
+                            reasons: f.reasons.map(reasonText) }))
+  }, null, 2);
+
+  view = null;
+  $('back').style.display = '';
+  $('htitle').textContent = T().exportTitle;
+  $('hcount').textContent = '';
+  foot.style.display = 'none';
+  $('prog').style.width = '100%';
+
+  main.innerHTML = `<div class="pad"><div class="done">
+    <h2>${esc(T().exportTitle)}</h2>
+    <p>${esc(T().exportSub)}</p>
+    <div class="big">${T().exportLine(del.length, `<bdi>${human(bytes)}</bdi>`)}</div>
+    <button class="primary" id="dl">${esc(T().download)}</button>
+    <button id="menu2">${esc(T().backToCats)}</button>
+    <textarea readonly onclick="this.select()">${esc(payload)}</textarea>
+    <div class="hint" style="margin-top:12px">${esc(T().downloadHint)}</div>
+  </div></div>`;
+
+  $('dl').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+    a.download = 'decisions.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+  $('menu2').onclick = showMenu;
+}
+
+/* ============================ wiring ============================ */
+let BROKEN = '';
+function rerender() {
+  applyLang();
+  BROKEN = T().notLoaded;
+  if (!view) showMenu();
+  else if (view.mode === 'grid') renderGrid();
+  else renderSwipe();
+}
+
+$('back').onclick = showMenu;
+$('lang').onclick = () => {
+  lang = lang === 'en' ? 'he' : 'en';
+  try { localStorage.setItem('archive-diet-lang', lang); } catch (e) {}
+  rerender();
+};
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Escape') {
+    const o = document.querySelector('.overlay');
+    if (o) { o.remove(); return; }
+    showMenu(); return;
+  }
+  if (!view || view.mode !== 'swipe') return;
+  const k = e.key.toLowerCase();
+  if (e.key === 'ArrowRight' || k === 'k') { e.preventDefault(); decide('keep'); }
+  else if (e.key === 'ArrowLeft' || k === 'd') { e.preventDefault(); decide('del'); }
+  else if (k === 'z' || e.key === 'Backspace') { e.preventDefault(); undo(); }
+});
+
+rerender();
+</script>
+</body>
+</html>

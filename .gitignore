@@ -1,0 +1,98 @@
+# ============================================================
+#  archive-diet — .gitignore
+#
+#  This repository handles people's personal photo archives.
+#  The rule is deny-by-default: no media, no scan output, no
+#  extracted archive ever reaches a commit. Documentation images
+#  are the single explicit exception, and they must be generated
+#  from synthetic demo data (scripts/make_demo.py) — never from a
+#  real archive.
+#
+#  Git history is permanent. A file committed once stays
+#  retrievable even after a later `git rm`. Keep this file ahead
+#  of the content, not behind it.
+# ============================================================
+
+# ---- media: deny everything, allow docs images explicitly ----
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.webp
+*.avif
+*.heic
+*.heif
+*.raw
+*.dng
+*.cr2
+*.nef
+*.arw
+*.mp4
+*.mov
+*.m4v
+*.avi
+*.mkv
+*.webm
+*.mpg
+*.mpeg
+*.3gp
+*.wmv
+
+# the one exception — verified synthetic screenshots only
+!docs/images/
+!docs/images/**
+
+# ---- tool output: contains real file paths and names ----
+decisions*.json
+manifest*.json
+*-manifest.txt
+inventory*.txt
+
+# a generated review page embeds the full candidate list of
+# whoever ran it. the shipped template lives in assets/.
+/review.html
+review-*.html
+
+# ---- working folders ----
+_pending-deletion*/
+demo-archive/
+demo_archive/
+extracted/
+archive/
+*.zip
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- secrets: nothing here should ever hold a key, but the cost of being
+#      wrong once is permanent, and git history does not forget ----
+id_*
+!id_*.py
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+
+# ---- machine-local agent config, not part of the tool ----
+.claude/
+
+# ---- macOS / editors ----
+.DS_Store
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
