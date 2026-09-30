@@ -1,7 +1,7 @@
 # archive-diet
 
-Move a photo archive out of a cloud service you are leaving — and drop the dead
-weight on the way out.
+Move a photo archive out of a cloud service you are leaving, and drop the dead
+weight on the way out!
 
 It is a [Claude Code](https://claude.com/claude-code) skill plus three small
 Python scripts. Point it at a ZIP export from any cloud photo service and it
@@ -13,7 +13,7 @@ cancel anything.
 **Nothing is ever deleted.** Approved files move to a folder you can browse.
 You empty it yourself, at the end, once the new copy is verified.
 
-**Nothing leaves your machine.** The review page is a local HTML file reading
+**Nothing leaves your machine.** The review page is a **local HTML file** reading
 images off your own disk. No server, no account, no upload. Cloud-to-cloud
 transfer services route your family photos through their infrastructure; this
 does not.
@@ -22,17 +22,16 @@ does not.
 
 ## Why it exists
 
-I found an old cloud backup of mine that was about to be deleted — photos going
+I found an old cloud backup of mine that was about to be deleted, having photos going
 back over a decade, the kind you cannot get again. I started paying for that
 service to save them.
 
-Which left me paying two clouds at once: that one, and the storage already
-bundled with the devices I use. Moving the archive by hand and cancelling felt
-risky, so I put it off, the way people do.
+Which left me paying one more unnecessary subscription: that one, adding to the storage already
+bundled with the devices I use. I paid to protect my memories and put it off, the way people do.
 
-When I finally measured it, a fifth of the archive was junk: screenshots,
+When I looked at it briefly, I've found that a lot of the content there was junk: screenshots,
 duplicates, thumbnails, huge videos I would never watch. Moving it as-is would
-have carried all of that into the cloud I was keeping — and pushed me toward a
+have carried all of that into the cloud I was keeping, and pushed me toward a
 bigger paid tier there too.
 
 So the tool does both jobs at once. It migrates, and it slims.
@@ -52,7 +51,7 @@ contact sheet, because clicking through six hundred cards is not reviewing.
 
 ![Grid review](docs/images/02-grid.jpg)
 
-*Both screenshots are of generated demo data — see below.*
+*Both screenshots are of generated demo data, see below.*
 
 The interface has an English / Hebrew toggle.
 
@@ -84,8 +83,8 @@ python3 scripts/make_demo.py ./demo-archive
 python3 scripts/scan.py ./demo-archive --big-image 4
 ```
 
-This generates a synthetic archive — coloured gradients and flat panels, no real
-images anywhere — with screenshots at genuine screen dimensions, duplicates,
+This generates a synthetic archive: colored gradients and flat panels, no real
+images anywhere, with screenshots at genuine screen dimensions, duplicates,
 oversized files and thumbnails, so every category populates. Walk the whole
 workflow on it before pointing anything at your own photos.
 
@@ -100,7 +99,7 @@ cd demo-archive && python3 -m http.server 8790 --bind 127.0.0.1
 
 ## Using it for real
 
-With Claude Code, the skill drives the whole thing — describe what you are doing
+With Claude Code, the skill drives the whole thing. Describe what you are doing
 and it will take you through export, extraction, verification, review, and the
 move, stopping at each point that needs your decision.
 
@@ -143,7 +142,7 @@ Claude will pick it up from the next session.
 
 ## Requirements
 
-Python 3.8 or newer, standard library only — no packages to install. A browser
+Python 3.8 or newer, standard library only. No packages to install. A browser
 for the review page. Works anywhere Python does; the migration guidance is
 platform-agnostic, with notes where a specific destination behaves unusually.
 
@@ -152,7 +151,7 @@ platform-agnostic, with notes where a specific destination behaves unusually.
 ## A word on what this does not do
 
 It is not a backup tool and it does not make your archive safe. A synced cloud
-folder is one copy that happens to appear in several places — delete a file and
+folder is one copy that happens to appear in several places - delete a file and
 it disappears everywhere. If the archive matters, keep a second copy that does
 not sync. The skill will raise this at the point where it becomes relevant.
 
